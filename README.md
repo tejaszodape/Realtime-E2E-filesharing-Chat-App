@@ -41,8 +41,7 @@ LINK:- https://realtime-e2e-filesharing-chat-app.onrender.com
 ### Prerequisites
 - Node.js v18+
 - MongoDb
-- Defender API key (or use mock mode for development)
-
+- Windows 10/11 operating system(for Defender) 
 ### Installation
 
 ```bash
