@@ -33,7 +33,7 @@ LINK:- https://realtime-e2e-filesharing-chat-app.onrender.com
 - **Backend**: Node.js, Express, Socket.IO  
 - **Security**: AES-256, ECDH (secp256r1 curve), bcrypt, JWT  
 - **Malware Scanning**: Defender-compatible API (configurable)  
-- **Database**: MongoDb – stores only public keys & metadata    
+- **Database**: MongoDb – stores only public keys & private key(encrypted using user password) and meta date    
 ---
 
 ## 🚀 Local Setup
