@@ -2,6 +2,18 @@
 
 A secure, privacy-focused chat application built with **Node.js** and **React**, featuring **end-to-end encryption (E2E)** and real-time **malware scanning** for all file transfers.
 ---
+LINK:- https://realtime-e2e-filesharing-chat-app.onrender.com
+
+#(Note: I have created i bypass for Malware Scanning as the render server don't allow Defender.If Run locally remove the code in backend/routes/scan.route.js/ line no 64 -69 
+
+#if (!DEFENDER_PATH) {
+    console.warn("⚠️ Defender not found – bypassing scan (development mode)");
+    cleanup();
+    // ⚠️ In production, you might want to block files instead!
+    return res.json({ status: "clean", details: "Defender unavailable – scan bypassed" });
+  }
+
+
 ## ✨ Features
 
 - 🔐 **End-to-end encryption** using **AES-256-GCM**  
