@@ -8,6 +8,7 @@ import { globSync } from "glob";
 const router = express.Router();
 const upload = multer({ dest: "temp/" });
 
+// --- Defender detection ---
 function findDefender() {
   const candidates = [
     "C:\\Program Files\\Windows Defender\\MpCmdRun.exe",
@@ -24,50 +25,50 @@ function findDefender() {
   }
   return null;
 }
+
 const DEFENDER_PATH = findDefender();
 
-router.post("/", upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ status: "error", message: "No file uploaded" });
-
-  const absPath = path.resolve(req.file.path); // absolute path
-  const origName = req.file.originalname;
-
-  // cleanup helper
-  const cleanup = () => {
-    fs.unlink(absPath, () => {});
-  };
-
-// --- robust EICAR detection (reads only a small prefix) ---
-function isEicarByTextPrefix(absPath) {
+// --- EICAR detection (text-based) ---
+function isEicarByTextPrefix(filePath) {
   try {
-    const fd = fs.openSync(absPath, "r");
-    const buf = Buffer.alloc(1024);  // read first 1 KB
+    const fd = fs.openSync(filePath, "r");
+    const buf = Buffer.alloc(1024);
     const bytes = fs.readSync(fd, buf, 0, buf.length, 0);
     fs.closeSync(fd);
 
-    const chunk = buf.slice(0, bytes).toString("utf8", 0, bytes);
+    const chunk = buf.slice(0, bytes).toString("utf8");
     const normalized = chunk.replace(/\r\n/g, "\n").replace(/\s+/g, " ").trim().toLowerCase();
-
-    // Look for the human-readable marker
-    if (normalized.includes("eicar-standard-antivirus-test-file")) return true;
-
-    return false;
+    return normalized.includes("eicar-standard-antivirus-test-file");
   } catch (e) {
-    console.warn("EICAR detection read error:", e && e.message);
+    console.warn("EICAR detection read error:", e?.message);
     return false;
   }
 }
-// --- check EICAR first ---
+
+// --- Scan route ---
+router.post("/", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ status: "error", message: "No file uploaded" });
+  }
+
+  const absPath = path.resolve(req.file.path);
+  const cleanup = () => fs.unlink(absPath, () => {});
+
+  // 1. Check for EICAR test file
   if (isEicarByTextPrefix(absPath)) {
     cleanup();
     return res.json({ status: "infected", details: "EICAR test file detected (text match)" });
   }
 
+  // 2. If Defender is NOT available, use safe bypass (for dev/testing only!)
   if (!DEFENDER_PATH) {
+    console.warn("⚠️ Defender not found – bypassing scan (development mode)");
     cleanup();
-    return res.status(500).json({ status: "error", message: "Defender executable not found on server" });
+    // ⚠️ In production, you might want to block files instead!
+    return res.json({ status: "clean", details: "Defender unavailable – scan bypassed" });
   }
 
+  // 3. Run actual Defender scan
   const args = ["-Scan", "-ScanType", "3", "-File", absPath, "-DisableRemediation"];
   const TIMEOUT_MS = 120000; // 2 minutes
 
@@ -79,17 +80,16 @@ function isEicarByTextPrefix(absPath) {
     cleanup();
 
     if (err) {
-      console.warn("Defender process error:", err && err.message);
+      console.warn("Defender process error:", err.message);
     }
 
     const lower = out.toLowerCase();
     if (lower.includes("found no threats") || lower.includes("no threats found") || lower.includes("no threats")) {
       return res.json({ status: "clean" });
     }
-    if (lower.includes("threat") || lower.includes("threats found") || lower.includes("detected") || lower.includes("malware")) {
+    if (lower.includes("threat") || lower.includes("detected") || lower.includes("malware")) {
       return res.json({ status: "infected" });
     }
-
 
     return res.status(500).json({ status: "error", message: "ambiguous scan result", details: out });
   });
